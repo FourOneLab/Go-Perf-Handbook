@@ -1,0 +1,10 @@
+module github.com/promacanthus/Go-Perf-Handbook
+
+go 1.17
+
+require (
+	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
+	google.golang.org/protobuf v1.27.1
+)
+
+require golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
