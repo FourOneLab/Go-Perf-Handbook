@@ -1,0 +1,11 @@
+syntax = "proto3";
+package serialization;
+
+option go_package = "./serialization";
+
+message BookProto {
+  string title = 1;
+  string author = 2;
+  int64 pages = 3;
+  repeated string chapters = 4;
+}
