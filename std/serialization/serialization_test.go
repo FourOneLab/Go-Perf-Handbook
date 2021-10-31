@@ -38,6 +38,7 @@ func generatePBObject() *BookProto {
 func BenchmarkJSONMarshal(b *testing.B) {
 	book := generateObject()
 	b.ResetTimer()
+	
 	for i := 0; i < b.N; i++ {
 		_, err := json.Marshal(book)
 		if err != nil {
@@ -53,6 +54,7 @@ func BenchmarkJSONUnmarshal(b *testing.B) {
 	}
 	book := &Book{}
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		if err = json.Unmarshal(out, book); err != nil {
 			panic(err)
@@ -90,6 +92,7 @@ func BenchmarkGobMarshal(b *testing.B) {
 	book := generateObject()
 	encoder := gob.NewEncoder(ioutil.Discard)
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		if err := encoder.Encode(book); err != nil {
 			panic(err)

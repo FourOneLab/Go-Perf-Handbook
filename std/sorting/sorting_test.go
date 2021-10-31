@@ -23,19 +23,19 @@ func BenchmarkSort1000(b *testing.B) {
 	}
 }
 
-func BenchmarkSort100000(b *testing.B) {
+func BenchmarkSort10000(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		s := generateSlice(100000)
+		s := generateSlice(10000)
 		b.StartTimer()
 		sort.Ints(s)
 	}
 }
 
-func BenchmarkSort10000000(b *testing.B) {
+func BenchmarkSort100000(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		s := generateSlice(10000000)
+		s := generateSlice(100000)
 		b.StartTimer()
 		sort.Ints(s)
 	}
