@@ -22,10 +22,10 @@ usage: go test [build/test flags] [packages] [build/test flags & test binary fla
 
 ### 运行模式
 
-1. **本地目录（local directory）**模式：没有指定包级别参数时使用这种模式，如 `go test`，`go test -v`。
+1. 本地目录（local directory）模式：没有指定包级别参数时使用这种模式，如 `go test`，`go test -v`。
    1. 此模式下，只会编译本目录下的源文件为测试二进制文件，并运行测试
    2. 此模式下，测试结果是不会被缓存起来的
-2. **包列表（package list）**模式：显式的使用包级别参数，如 `go test <package_name>`、`go test ./...`、`go test .`。
+2. 包列表（package list）模式：显式的使用包级别参数，如 `go test <package_name>`、`go test ./...`、`go test .`。
    1. 此模式下，会编译列表中的每一个包中的源文件为测试二进制文件，并运行测试（测试成功的包，只会输出 `OK`，测试失败的包，将会打印全部的测试输出）
    2. 此模式下，指定 `-bench`、`-v` 参数，那么成功与否都会打印全部的测试输出
    3. 此模式下，只要有一个包测试失败，最终的测试结果就是失败
@@ -91,8 +91,8 @@ func ExamplePerm() {
 
 ## 标准库
 
-Golang版本：go1.17.2
-CPU：Intel(R) Xeon(R) Platinum 8255C CPU @ 2.50GHz
+- Golang版本：go1.17.2
+- CPU：Intel(R) Xeon(R) Platinum 8255C CPU @ 2.50GHz
 
 ### 字符串
 
