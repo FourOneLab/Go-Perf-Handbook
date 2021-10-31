@@ -28,7 +28,7 @@ func startHTTPServer() {
 	}
 	httpServer = &http.Server{Handler: &testHandler{}}
 
-	lis, err := net.Listen("tcp", ":8080")
+	lis, err := net.Listen("tcp", ":8081")
 	if err != nil {
 		panic(err)
 	}
@@ -80,7 +80,7 @@ func BenchmarkHTTP(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		sendRequest(client, "http://localhost:8080")
+		sendRequest(client, "http://localhost:8081")
 	}
 }
 
@@ -90,7 +90,7 @@ func BenchmarkHTTPNoKeepAlive(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		sendRequest(client, "http://localhost:8080")
+		sendRequest(client, "http://localhost:8081")
 	}
 }
 
