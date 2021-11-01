@@ -335,3 +335,172 @@ BenchmarkHTTPSNoKeepAlive-2          100          11610812 ns/op          189822
 ## Golang 高级优化技巧
 
 ### 内存对齐
+
+为什么要关心内存对齐：
+
+1. 正在编写的代码在性能（CPU、Memory）方面有一定的要求
+2. 正在处理向量方面的指令
+3. 某些硬件平台（ARM）体系不支持未对齐的内存访问
+
+为什么要做内存对齐：
+
+1. 平台（移植性）原因：不是所有的硬件平台都能够访问任意地址上的任意数据。例如：特定的硬件平台只允许在特定地址获取特定类型的数据，否则会导致异常情况
+2. 性能原因：若访问未对齐的内存，将会导致 CPU 进行两次内存访问，并且要花费额外的时钟周期来处理对齐及运算。而本身就对齐的内存仅需要一次访问就可以完成读取动作
+
+#### 内存布局
+
+```go
+type Foo struct {
+  A int8 // 1
+  B int8 // 1 
+  C int8 // 1
+}
+
+var f Foo
+fmt.Println(unsafe.Sizeof(f)) // 3
+
+type Bar struct {
+  x int32 // 4
+  y *Foo  // 8 (64位处理器)
+  z bool  // 1
+}
+
+var b Bar
+fmt.Println(unsafe.Sizeof(b)) // 24
+```
+
+从上面的示例，乍一看，变量 `b` 的内存大小应该是 13，但其实是 24。这是因为 Go 编译器会按照一定的规则自动进行内存对齐。这样设计是为了减少 CPU 访问内存的次数，从而加大 CPU 的吞吐量。如果不进行对其的话，很可能会增加 CPU 访问内存的次数。
+
+> 因为，CPU 在访问内存时，是按照字长来访问的（64位的处理器，字长是8个字节），所以，CPU 每次访问内存的单位就是8字节，每次加载内存数据可以是若干个字长，也就是8字节的整数倍。如果不进行内存对齐，那么在访问某个结构体时，可能会出现某个字段跨一个字长的情况，此时就需要读取两次内存了。 
+
+### 对齐系数
+
+```go
+var b1 Bar
+
+// 结构体变量的对齐系数
+fmt.Println(unsafe.Alignof(b1)) // 8
+
+// 结构体变量中每个字段的对齐系数
+fmt.Println(unsafe.Alignof(b1.x)) // 4
+fmt.Println(unsafe.Alignof(b1.y)) // 8
+fmt.Println(unsafe.Alignof(b1.z)) // 1
+```
+
+对齐系数，表示这个变量需要按照对齐系数的整数倍进行对齐。
+
+`unsafe.Alignof()`函数的规则：
+
+1. 任意的变量，对齐系数至少为1
+2. 结构体变量，对齐系数是所有变量中对齐系数最大的那个变量的对齐系数
+3. 数组类型变量，数组中元素类型的对齐系数的倍数
+
+因此，可以通过调整结构体字段的顺序，来降低占用的内存，如交换y和z的位置。
+
+```go
+type Bar struct {
+  x int32 // 4
+  z bool  // 1
+  y *Foo  // 8 (64位处理器)
+}
+
+var b2 Bar
+fmt.Println(unsafe.Sizeof(b2)) // 16
+```
+
+### 特殊场景
+
+#### 空结构体字段对齐
+
+如果结构或数组中不包含 `size` 大于零的字段（或元素），则其大小为0。两个不同的0大小变量在内存中可能有相同的地址。
+
+由于空结构体 `struct{}` 的大小为 0:
+
+- 当结构体中包含空结构体类型的字段时，通常不需要进行内存对齐,
+- 当空结构体类型作为结构体的最后一个字段时，如果有指向该字段的指针，那么就会返回该结构体之外的地址。为了避免内存泄露会额外进行一次内存对齐。
+
+```go
+type Demo1 struct {
+  m struct{} // 0
+  n int8     // 1
+}
+
+var d1 Demo1
+fmt.Println(unsafe.Sizeof(d1))  // 1
+
+type Demo2 struct {
+  n int8     // 1
+  m struct{} // 0
+}
+
+var d2 Demo2
+fmt.Println(unsafe.Sizeof(d2))  // 2
+```
+
+访问 `d2.m` 可能会造成内存泄露，因此会进行一次内存对齐。
+
+在实际编程中通过灵活应用空结构体大小为0的特性能够帮助我们节省很多不必要的内存开销。
+
+- 使用空结构体作为map的值来实现一个类似 Set 的数据结构
+- 使用空结构体作为通知类 channel 的元素
+
+#### 原子操作在32位平台要求强制内存对齐
+
+在 x86 平台上原子操作需要强制内存对齐是因为在 32bit 平台下进行 64bit 原子操作要求必须 8 字节对齐，否则程序会 panic。
+
+```go
+// src/atomic/doc.go
+
+// BUG(rsc): On 386, the 64-bit functions use instructions unavailable before the Pentium MMX.
+//
+// On non-Linux ARM, the 64-bit functions use instructions unavailable before the ARMv6k core.
+//
+// On ARM, 386, and 32-bit MIPS, it is the caller's responsibility
+// to arrange for 64-bit alignment of 64-bit words accessed atomically.
+// The first word in a variable or in an allocated struct, array, or slice can
+// be relied upon to be 64-bit aligned.
+```
+
+#### false sharing
+
+结构体内存对齐除了上面的场景外，在一些需要防止 CacheLin e伪共享的时候，也需要进行特殊的字段对齐。例如 `sync.Pool` 中就有这种设计：
+
+```go
+type poolLocal struct {
+  poolLocalInternal
+
+  // Prevents false sharing on widespread platforms with
+  // 128 mod (cache line size) = 0 .
+  pad [128 - unsafe.Sizeof(poolLocalInternal{})%128]byte
+}
+```
+结构体中的pad字段就是为了防止 false sharing 而设计的。
+
+> 当不同的线程同时读写同一个 cache line 上不同数据时就可能发生 false sharing。false sharing 会导致多核处理器上严重的系统性能下降。
+
+#### hot path
+
+hot path 是指执行非常频繁的指令序列。
+
+在访问结构体的第一个字段时，我们可以直接使用结构体的指针来访问第一个字段（结构体变量的内存地址就是其第一个字段的内存地址）。
+
+如果要访问结构体的其他字段，除了结构体指针外，还需要计算与第一个值的偏移(calculate offset)。在机器码中，偏移量是随指令传递的附加值，CPU 需要做一次偏移值与指针的加法运算，才能获取要访问的值的地址。因为，访问第一个字段的机器代码更紧凑，速度更快。
+
+下面的代码是标准库 sync.Once 中的使用示例，通过将常用字段放置在结构体的第一个位置上减少 CPU 
+
+```go
+// src/sync/once.go 
+
+// Once is an object that will perform exactly one action.
+//
+// A Once must not be copied after first use.
+type Once struct {
+  // done indicates whether the action has been performed.
+  // It is first in the struct because it is used in the hot path.
+  // The hot path is inlined at every call site.
+  // Placing done first allows more compact instructions on some architectures (amd64/386),
+  // and fewer instructions (to calculate offset) on other architectures.
+  done uint32
+  m    Mutex
+}
+```
