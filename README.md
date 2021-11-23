@@ -504,3 +504,48 @@ type Once struct {
   m    Mutex
 }
 ```
+
+### Goroutine
+
+####  泄漏检测器
+
+> 具有监控存活的 goroutine 数量功能的 APM (Application Performance Monitoring) 应用程序性能监控可以轻松查出 goroutine 泄漏。goroutine 泄漏会导致内存中存活的 goroutine 数量不断上升，直到服务宕机为止。因此，可以在代码部署之前，通过一些方法来检查程序中是否存在泄漏。
+
+[goleak](https://github.com/uber-go/goleak) 可以监控当前测试代码中泄漏的 goroutine，由Uber开源可与单元测试结合使用。启用泄漏检测的唯一要求就是在测试代码结束之前，调用 goleak 库来检测泄漏的 goroutine。事实上，goleak 检测了所有的 goroutine 而不是只检测泄漏的 goroutine。
+
+goleak是基于标准库`runtime.Stack`获取到 goroutine 的堆栈信息的。goleak 解析所有的 goroutine 出并通过以下规则过滤 go 标准库中产生的 goroutine：
+
+1. 由 go test 创建来运行测试逻辑的 goroutine。例如上图中的第二个 goroutine
+2. 由 runtime 创建的 goroutine，例如监听信号接收的 goroutine，参阅 [Go: gsignal, Master of goroutine](https://medium.com/a-journey-with-go/go-gsignal-master-of-signals-329f7ff39391)
+3. 当前运行的 goroutine，例如上图的第一个 goroutine
+
+[示例代码](goroutine/goleak/example.go),输出结果如下所示：
+
+```bash
+Running tool: /usr/local/go/bin/go test -timeout 30s -run ^Test_leak$ example/goroutine/goleak
+
+=== RUN   Test_leak
+=== RUN   Test_leak/leak_goroutine
+=== CONT  Test_leak
+    /home/ubuntu/Go-Perf-Handbook/goroutine/goleak/leaks.go:78: found unexpected goroutines:
+        [Goroutine 20 in state sleep, with time.Sleep on top of the stack:
+        goroutine 20 [sleep]:
+        time.Sleep(0xdf8475800)
+                /usr/local/go/src/runtime/time.go:193 +0x12e
+        example/goroutine/goleak.leak.func1()
+                /home/ubuntu/Go-Perf-Handbook/goroutine/goleak/example.go:7 +0x25
+        created by example/goroutine/goleak.leak
+                /home/ubuntu/Go-Perf-Handbook/goroutine/goleak/example.go:6 +0x25
+        ]
+--- FAIL: Test_leak (0.44s)
+    --- PASS: Test_leak/leak_goroutine (0.00s)
+FAIL
+FAIL    example/goroutine/goleak        0.446s
+```
+
+从报错信息中可以看到详细的 Goroutine 堆栈信息，可以快速调试并了解发生泄露的 Goroutine。
+
+goleak存在的缺陷：
+
+1. 三方库或者运行在后台中，遗漏的 goroutine 将会造成虚假的结果(无 goroutine 泄漏)
+2. 如果在其他未使用 goleak 的测试代码中使用了 goroutine，那么泄漏结果也是错误的。如果这个 goroutine 一直运行到下次使用 goleak 的代码， 则结果也会被这个 goroutine 影响，发生错误。
