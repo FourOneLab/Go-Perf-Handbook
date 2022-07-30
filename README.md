@@ -2,6 +2,43 @@
 
 Golang's performance.
 
+## Latency Numbers Every Programmer Should Know
+
+```shell
+Latency Comparison Numbers (~2012)
+----------------------------------
+L1 cache reference                           0.5 ns
+Branch mispredict                            5   ns
+L2 cache reference                           7   ns                      14x L1 cache
+Mutex lock/unlock                           25   ns
+Main memory reference                      100   ns                      20x L2 cache, 200x L1 cache
+Compress 1K bytes with Zippy             3,000   ns        3 us
+Send 1K bytes over 1 Gbps network       10,000   ns       10 us
+Read 4K randomly from SSD*             150,000   ns      150 us          ~1GB/sec SSD
+Read 1 MB sequentially from memory     250,000   ns      250 us
+Round trip within same datacenter      500,000   ns      500 us
+Read 1 MB sequentially from SSD*     1,000,000   ns    1,000 us    1 ms  ~1GB/sec SSD, 4X memory
+Disk seek                           10,000,000   ns   10,000 us   10 ms  20x datacenter roundtrip
+Read 1 MB sequentially from disk    20,000,000   ns   20,000 us   20 ms  80x memory, 20X SSD
+Send packet CA->Netherlands->CA    150,000,000   ns  150,000 us  150 ms
+
+Notes
+-----
+1 ns = 10^-9 seconds
+1 us = 10^-6 seconds = 1,000 ns
+1 ms = 10^-3 seconds = 1,000 us = 1,000,000 ns
+
+Credit
+------
+By Jeff Dean:               http://research.google.com/people/jeff/
+Originally by Peter Norvig: http://norvig.com/21-days.html#answers
+
+Contributions
+-------------
+'Humanized' comparison:  https://gist.github.com/hellerbarde/2843375
+Visual comparison chart: http://i.imgur.com/k0t1e.png
+```
+
 ## 深入理解 Golang 数据结构
 
 ## 测试工具
@@ -44,7 +81,7 @@ usage: go test [build/test flags] [packages] [build/test flags & test binary fla
 
 - `-args` ：将这个参数后面的部分都传递给测试二进制文件，这个参数一般放在最后。
 - `-c` ：将测试二进制文件编译为 `pkg.test`，而不会运行测试文件 (其中 `pkg` 是包导入路径的最后一个元素)，可以使用 `-o` 标志修改文件名。
-- `-exec xprog` ：使用 `xprog` 运行测试二进制文件，行为和 `go run `一样。
+- `-exec xprog` ：使用 `xprog` 运行测试二进制文件，行为和 `go run`一样。
 - `-i` ：（弃用）安装测试依赖的包，而不会运行测试文件，被编译的包都会自动被缓存起来。
 - `-json` ：将测试的输出内容转换为 JSON 格式，运行 `go doc test2json 获取关于编码的细节。
 - `-o file` ：将测试二进制文件编译到指定的文件中，测试将会继续执行，除非指定了 `-c` 或 `-i` 参数。
@@ -165,6 +202,7 @@ BenchmarkSort100000-2                 79          15146117 ns/op              24
 BenchmarkMathRand-2             71665480                16.44 ns/op            0 B/op          0 allocs/op
 BenchmarkCryptoRand-2             899103                 1318 ns/op           56 B/op          4 allocs/op
 ```
+
 ### 生成随机的字符串
 
 使用标准库 `math/rand` 和 `crypto/rand` 生成长度为16的均匀分部的字符串。
@@ -194,6 +232,7 @@ BenchmarkSliceAppendPreAlloc-2          1000000000               1.073 ns/op    
 ### 读取 `Map`
 
 比较以 `int` 类型为key和以 `string` 类型为key时，从Map中读取值时的性能差异。
+
 #### 性能
 
 [示例代码](./std/map_access/map_access_test.go)
@@ -330,6 +369,7 @@ BenchmarkHTTP-2                    31004             39801 ns/op            5712
 BenchmarkHTTPNoKeepAlive-2          7567            173512 ns/op           17872 B/op        139 allocs/op
 BenchmarkHTTPSNoKeepAlive-2          100          11610812 ns/op          189822 B/op       1286 allocs/op
 ```
+
 ## Golang 并发模式
 
 ## Golang 高级优化技巧
@@ -371,7 +411,7 @@ fmt.Println(unsafe.Sizeof(b)) // 24
 
 从上面的示例，乍一看，变量 `b` 的内存大小应该是 13，但其实是 24。这是因为 Go 编译器会按照一定的规则自动进行内存对齐。这样设计是为了减少 CPU 访问内存的次数，从而加大 CPU 的吞吐量。如果不进行对其的话，很可能会增加 CPU 访问内存的次数。
 
-> 因为，CPU 在访问内存时，是按照字长来访问的（64位的处理器，字长是8个字节），所以，CPU 每次访问内存的单位就是8字节，每次加载内存数据可以是若干个字长，也就是8字节的整数倍。如果不进行内存对齐，那么在访问某个结构体时，可能会出现某个字段跨一个字长的情况，此时就需要读取两次内存了。 
+> 因为，CPU 在访问内存时，是按照字长来访问的（64位的处理器，字长是8个字节），所以，CPU 每次访问内存的单位就是8字节，每次加载内存数据可以是若干个字长，也就是8字节的整数倍。如果不进行内存对齐，那么在访问某个结构体时，可能会出现某个字段跨一个字长的情况，此时就需要读取两次内存了。
 
 ### 对齐系数
 
@@ -474,6 +514,7 @@ type poolLocal struct {
   pad [128 - unsafe.Sizeof(poolLocalInternal{})%128]byte
 }
 ```
+
 结构体中的pad字段就是为了防止 false sharing 而设计的。
 
 > 当不同的线程同时读写同一个 cache line 上不同数据时就可能发生 false sharing。false sharing 会导致多核处理器上严重的系统性能下降。
@@ -486,7 +527,7 @@ hot path 是指执行非常频繁的指令序列。
 
 如果要访问结构体的其他字段，除了结构体指针外，还需要计算与第一个值的偏移(calculate offset)。在机器码中，偏移量是随指令传递的附加值，CPU 需要做一次偏移值与指针的加法运算，才能获取要访问的值的地址。因为，访问第一个字段的机器代码更紧凑，速度更快。
 
-下面的代码是标准库 sync.Once 中的使用示例，通过将常用字段放置在结构体的第一个位置上减少 CPU 
+下面的代码是标准库 sync.Once 中的使用示例，通过将常用字段放置在结构体的第一个位置上减少 CPU
 
 ```go
 // src/sync/once.go 
@@ -507,7 +548,7 @@ type Once struct {
 
 ### Goroutine
 
-####  泄漏检测器
+#### 泄漏检测器
 
 > 具有监控存活的 goroutine 数量功能的 APM (Application Performance Monitoring) 应用程序性能监控可以轻松查出 goroutine 泄漏。goroutine 泄漏会导致内存中存活的 goroutine 数量不断上升，直到服务宕机为止。因此，可以在代码部署之前，通过一些方法来检查程序中是否存在泄漏。
 
